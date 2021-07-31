@@ -1,7 +1,0 @@
--rw-r--r--  1 apple  staff    287  7 19 14:28 Makefile
--rwxr-xr-x  1 apple  staff  54616  7 20 17:22 ftserve
--rw-r--r--  1 apple  staff  11767  7 20 17:22 ftserve.c
--rw-r--r--  1 apple  staff    668  7 19 17:12 ftserve.h
--rw-r--r--  1 apple  staff  23232  7 20 17:22 ftserve.o
--rw-r--r--  1 apple  staff      0  7 20 16:44 oo.txt
--rw-r--r--  1 apple  staff      0  7 20 17:22 tmp.txt
