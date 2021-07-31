@@ -5,6 +5,7 @@
 Thanks to the code author
 ## build a image of dmsql on docker
 docker 镜像路径：[dmlinux](https://hub.docker.com/repository/docker/rzzhimo/dmlinux)
+odbc 接口：[dm interface](https://eco.dameng.com/docs/zh-cn/app-dev/c_c++_odbc.html#安装-DM-数据库)
 ## implement a ftp with C
 ## ftp usage
 Usage： Server端：./ftserver port  

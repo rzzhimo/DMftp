@@ -449,7 +449,7 @@ int main(int argc, char* argv[])
     s = getaddrinfo(host, port, &hints, &res);
     if (s != 0) 
     {
-        printf("getaddrinfo() error %s", gai_strerror(s));
+        printf("getaddrinfo() error %s\n", gai_strerror(s));
         exit(1);
     }
     
