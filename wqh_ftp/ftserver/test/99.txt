@@ -1,0 +1,6 @@
+-rwxr-xr-x 1 root root 61800 Jul 22 09:10 ftserve
+-rw-r--r-- 1 root root 20707 Jul 22 09:10 ftserve.c
+-rw-r--r-- 1 root root   803 Jul 22 08:44 ftserve.h
+-rw-r--r-- 1 root root 67224 Jul 22 09:10 ftserve.o
+-rw-r--r-- 1 root root   468 Jul 21 08:55 Makefile
+-rw-rw-rw- 1 root root     0 Jul 22 09:12 tmp.txt

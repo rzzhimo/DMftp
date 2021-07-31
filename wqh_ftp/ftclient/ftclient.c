@@ -4,7 +4,18 @@ ftclient.c
 #include "ftclient.h"
     
 int sock_control; 
+int dellast(char *szBuf)
+{
+	int i; 
+    //printf("szBuf len is :%d\n",strlen(szBuf));
+    i = strlen(szBuf)-1; 
+    while(szBuf[i] == ' '&&i >0) 
+    i--; 
+    szBuf[i+1] = '\0';
 
+    return 0;
+	
+ } 
 /**
  * 接收服务器响应
  * 错误返回 -1，正确返回状态码
@@ -34,10 +45,34 @@ void print_reply(int rc)
             printf("221 Goodbye!\n");
             break;
         case 226:
-            printf("226 Closing data connection. Requested file action successful.\n");
+            printf("226 download file action successful.\n");
+            break;
+        case 225:
+            printf("225 upload remote file  successful.\n");
             break;
         case 550:
-            printf("550 Requested action not taken. File unavailable.\n");
+            printf("550 Delete Requested action not taken. File unavailable.\n");
+            break;
+        case 551:
+            printf("551 Uplpad requested action not taken. File has existed.\n");
+            break;
+        case 222:
+            printf("222 File delete successfully.\n");
+            break;
+        case 522:
+            printf("522 File delete failed.\n");
+            break;
+        case -1:
+            printf("-1 path is illegal.\n");
+            break;
+        case 0:
+            printf("0 file is end.\n");
+            break;
+        case 553:
+            printf("upload failed.\n");
+            break;
+        case 223:
+            printf("upload success.\n");
             break;
     }
 }
@@ -57,18 +92,30 @@ int ftclient_read_command(char* buf, int size, struct command *cstruct)
     arg = strtok (buf," ");
     arg = strtok (NULL, " ");
 
-    if (arg != NULL)
-        strncpy(cstruct->arg, arg, strlen(arg));
+    while (arg != NULL)
+    {
+        strcat(cstruct->arg, arg);
+        strcat(cstruct->arg, " ");
+        arg = strtok (NULL, " ");
+    }
+    dellast(cstruct->arg);
+    //printf("cstruct->arg is %s \n",cstruct->arg);
 
-    if (strcmp(buf, "list") == 0) 
+    if (strcmp(buf, "ls") == 0) 
         strcpy(cstruct->code, "LIST");
 
-    else if (strcmp(buf, "get") == 0)
-        strcpy(cstruct->code, "RETR");
-
+    else if (strcmp(buf, "download") == 0)
+        strcpy(cstruct->code, "DOWN");
+    else if (strcmp(buf, "upload") == 0)
+        strcpy(cstruct->code, "UPLD");
     else if (strcmp(buf, "quit") == 0) 
         strcpy(cstruct->code, "QUIT");
-    
+    //delete指令
+    else if (strcmp(buf, "delete") == 0) 
+        strcpy(cstruct->code, "DELE");
+    //history指令
+    else if (strcmp(buf, "history") == 0) 
+        strcpy(cstruct->code, "HIST");
     else 
         return -1; // 不合法
 
@@ -76,22 +123,31 @@ int ftclient_read_command(char* buf, int size, struct command *cstruct)
     strcpy(buf, cstruct->code);  // 存储命令到 buf 开始处
 
     /* 如果命令带有参数，追加到 buf */
-    if (arg != NULL) 
+    if(strlen(cstruct->arg)>0)
     {
         strcat(buf, " ");
         strncat(buf, cstruct->arg, strlen(cstruct->arg));
     }
+    
+    printf("本次执行命令为：\'%s\' \n",buf);
     return 0;
 }
 
 /**
- * 实现 get <filename> 命令行
+ * 实现 download  <remote_file>  <local_file>命令行
  */
-int ftclient_get(int data_sock, int sock_control, char* arg)
+int ftclient_dwld(int data_sock, int sock_control, char* arg)
 {
+    //printf("%s",arg);
     char data[MAXSIZE];
     int size;
-    FILE* fd = fopen(arg, "w"); // 创建并打开名字为 arg 的文件
+    char* l_file;
+    char*  r_file;
+    r_file = strtok (arg," ");
+    l_file = strtok (NULL," ");
+    //printf("%s",r_file);
+    //printf("%s",l_file);
+    FILE* fd = fopen(l_file, "w"); // 创建并打开名字为 arg 的文件
 
     /* 将服务器传来的数据（文件内容）写入本地建立的文件 */
     while ((size = recv(data_sock, data, MAXSIZE, 0)) > 0) 
@@ -104,6 +160,108 @@ int ftclient_get(int data_sock, int sock_control, char* arg)
     return 0;
 }
 
+/*判断upload时本地文件是否存在，并通知服务端*/
+int up_check_path(char *arg){  
+    char* l_file;
+    char* f;
+    f = strtok(arg," ");
+    if(strcmp(f,"-f")==0)
+    {
+        l_file = strtok (NULL," ");
+        
+    }
+    else
+    {
+        l_file = f;
+    }
+    char *p = "..";
+    if(access(l_file,0)<0 || strstr(l_file,p)){
+        send_response(sock_control, -1); 
+        printf("%s 该文件路径不合法\n",l_file);
+        return -1;
+    }else{
+        send_response(sock_control, 1); 
+    }   
+    return 0;
+}
+
+/**
+ * 实现 upload [-f] <local_file> <remote_file> #上传文件， -f参数表示强制覆盖
+ */
+int ftclient_upload(int data_sock, int sock_control, char* arg)
+{
+    printf("开始执行ftclient_upload\n"); 
+    
+    FILE* fd = NULL;
+    char data[MAXSIZE];
+    size_t num_read;      
+    char* l_file;
+    char*  r_file;
+   
+    char* f;
+    f = strtok(arg," ");
+    if(strcmp(f,"-f")==0)
+    {
+        l_file = strtok (NULL," ");
+        r_file = strtok (NULL," "); 
+    }
+    else
+    {
+        l_file = f;
+        r_file = strtok (NULL," "); 
+    }
+    printf("ftclient r_file is: \"%s\",l_file is: \"%s\"\n",r_file,l_file);  
+
+    
+    FILE *pFile = fopen(l_file, "r" );// 打开文件
+    if (!pFile)//打开失败
+    {
+        perror("upload open local file error\n");
+        return -1;
+    } 
+    int num = 0;
+    while (getc( pFile ) != EOF )
+    {
+    num++ ;
+    }
+    fclose( pFile );  
+    printf("字节数为:%d\n",num);     
+    int conv = htonl(num);
+    if (send(sock_control, &conv, sizeof conv, 0) < 0 ) 
+    {
+        perror("error sending...\n");
+        return -1;
+    }     
+    fd = fopen(l_file, "r"); // 打开文件
+
+    if (!fd)
+    {
+        perror("upload open local file error\n");
+        return -1;
+    } 
+    else
+    {    
+        //print_reply(read_reply());
+        do 
+        {
+            num_read = fread(data, 1, MAXSIZE, fd); // 读文件内容
+            if (num_read < 0) 
+                printf("error in upload fread()\n");
+
+            if (send(data_sock, data, num_read, 0) < 0) // 发送数据（文件内容）
+                perror("error in upload sending file\n");
+            
+            printf("从本地发送数据成功\n");
+            
+        }
+        while (num_read > 0);                      
+        fclose(fd);
+        }
+    printf("从本地发送数据完成\n");  
+    int reply = read_reply();
+    print_reply(reply);
+    return 0;
+}
 /**
  * 打开数据连接
  */
@@ -160,7 +318,40 @@ int ftclient_list(int sock_data, int sock_con)
     }
     return 0;
 }
+/**实现history -n命令
+ */
+int ftclient_hist(int data_sock, int sock_control){
+    size_t num_recvd;            
+    char buf[552];            
+    int tmp = 0;
 
+    /* 等待服务器启动的信息 */ 
+    if (recv(sock_control, &tmp, sizeof tmp, 0) < 0) 
+    {
+        perror("client: error reading message from server\n");
+        return -1;
+    }
+    
+    memset(buf, 0, sizeof(buf));
+
+    /* 接收服务器传来的数据 */
+    while ((num_recvd = recv(data_sock, buf, 552, 0)) > 0) 
+    {
+        printf("%s\n", buf);
+        memset(buf, 0, sizeof(buf));
+    }
+    
+    if (num_recvd < 0) 
+        perror("error");
+    
+    /* 等待服务器完成的消息 */ 
+    if (recv(sock_control, &tmp, sizeof tmp, 0) < 0) 
+    {
+        perror("client: error reading message from server\n");
+        return -1;
+    }
+    return 0;
+}
 /**
  * 输入含有命令(code)和参数(arg)的 command(cmd) 结构
  * 连接 code + arg,并放进一个字符串，然后发送给服务器
@@ -242,14 +433,14 @@ int main(int argc, char* argv[])
     struct addrinfo hints, *res, *rp;
 
     /* 命令行参数合法性检测 */
-    if (argc != 3)
+    if (argc != 2)
     {
-        printf("usage: ./ftclient hostname port\n");
+        printf("usage: ./ftclient hostname:port\n");
         exit(0);
     }
 
-    char *host = argv[1]; //所要连接的服务器主机名
-    char *port = argv[2]; //所要链接到服务器程序端口号
+    char *host = strtok(argv[1],":"); //所要连接的服务器主机名
+    char *port = strtok(NULL,":"); //所要链接到服务器程序端口号
 
     /* 获得和服务器名匹配的地址 */
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -281,7 +472,7 @@ int main(int argc, char* argv[])
         close(sock_control);
     }
     freeaddrinfo(rp);
-
+    printf("this sock_control is:%d\n",sock_control);
 
     /* 连接成功，打印信息 */
     printf("Connected to %s.\n", host);
@@ -302,14 +493,16 @@ int main(int argc, char* argv[])
         }
 
         /* 发送命令到服务器 */ 
+        printf("发送命令到服务器\n");
         if (send(sock_control, buffer, (int)strlen(buffer), 0) < 0 )
         {
             close(sock_control);
             exit(1);
         }
-
+        
+        
         retcode = read_reply();    //读取服务器响应（服务器是否可以支持该命令？）
-
+        printf("读取服务器响应 %d \n",retcode);
         if (retcode == 221)  // 退出命令
         {
             print_reply(221);        
@@ -318,33 +511,102 @@ int main(int argc, char* argv[])
         
         if (retcode == 502) 
             printf("%d Invalid command.\n", retcode);// 不合法的输入，显示错误信息
-
+            
         else 
         {            
             // 命令合法 (RC = 200),处理命令
-        
+            printf("命令合法\n");
             /* 打开数据连接 */
             if ((data_sock = ftclient_open_conn(sock_control)) < 0) 
             {
                 perror("Error opening socket for data connection");
                 exit(1);
             }            
-            
+            printf("this data_sock is:%d\n",data_sock);
             /* 执行命令 */
+            printf("start execute...\n");
             if (strcmp(cmd.code, "LIST") == 0) 
-                ftclient_list(data_sock, sock_control);
-            
-            else if (strcmp(cmd.code, "RETR") == 0) 
+                {
+                    if (read_reply()==-1)
+                    {
+                        print_reply(-1);
+                        continue;
+                    }else{
+                        ftclient_list(data_sock, sock_control);
+                    }
+                }
+            if (strcmp(cmd.code, "HIST") == 0) 
+                ftclient_hist(data_sock, sock_control);
+            else if (strcmp(cmd.code, "DOWN") == 0) 
             {
+                int path_flag = read_reply();//用于判断远程路径是否合法
+                if (path_flag == -1)
+                {
+                    print_reply(-1);
+                    continue;
+                }
+                //it means reply is 1
+
+                printf("start execute download...\n");
                 if (read_reply() == 550) // 等待回复
                 {
                     print_reply(550);        
                     close(data_sock);
                     continue; 
                 }
-                ftclient_get(data_sock, sock_control, cmd.arg);
+                //it means reply is 150
+                ftclient_dwld(data_sock, sock_control, cmd.arg);
+                
                 print_reply(read_reply()); 
             }
+            else if (strcmp(cmd.code, "UPLD") == 0) 
+            {
+                char  tmp[512]={0};
+                strcpy(tmp,cmd.arg);
+                int lpath_flag=up_check_path(tmp);//检查本地路径
+                if(lpath_flag == -1){
+                    print_reply(-1);
+                    continue;
+                }
+                int path_flag = read_reply();//用于判断远程路径是否合法
+                if (path_flag == -1)
+                {
+                    print_reply(-1);
+                    continue;
+                }
+                int icode = read_reply();
+                if (icode == 550) // 550 Requested action not taken
+                {
+                    print_reply(550);        
+                    close(data_sock);
+                    continue; 
+                }
+                else if (icode == 551) // 文件已存在
+                {
+                    print_reply(551);        
+                    close(data_sock);
+                    continue; 
+                }
+                else if(icode == 150){
+                    printf("start execute upload3...\n ");
+                    ftclient_upload(data_sock, sock_control, cmd.arg);
+                }
+                
+            }
+            else if (strcmp(cmd.code, "DELE") == 0)
+            {
+                retcode = read_reply();
+                if(retcode == -1){
+                    print_reply(-1);
+                }
+                else if(retcode == 222){
+                    print_reply(222);
+                }
+                else if (retcode == 522)
+                {
+                    print_reply(522);
+                }
+            }   
             close(data_sock);
         }
 

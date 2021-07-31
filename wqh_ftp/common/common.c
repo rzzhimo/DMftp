@@ -17,15 +17,16 @@ int socket_create(int port)
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
     {
         perror("socket() error"); 
+
         return -1; 
     }
 
     // 设置本地套接字地址
-    sock_addr.sin_family = AF_INET;
+    sock_addr.sin_family = AF_INET;/*该属性表示接收本机或其他机器传输*/
     sock_addr.sin_port = htons(port);
-    sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);        
+    sock_addr.sin_addr.s_addr = htonl(INADDR_ANY); //转换过来就是0.0.0.0，泛指本机的意思，也就是表示本机的所有IP   
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) 
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) //SO_REUSEADDR是让端口释放后立即就可以被再次使用
     {
         close(sockfd);
         perror("setsockopt() error");
@@ -140,6 +141,7 @@ int send_response(int sockfd, int rc)
     if (send(sockfd, &conv, sizeof conv, 0) < 0 ) 
     {
         perror("error sending...\n");
+        freesql();
         return -1;
     }
     return 0;
@@ -159,4 +161,37 @@ void read_input(char* buffer, int size)
         if (nl) 
             *nl = '\0'; // 出现换行符，则将该位置部位'\0'（字符串结尾）
     }
+}
+
+/*初始化环境
+*/
+void initsql()
+{
+    /* 申请一个环境句柄 */
+    SQLAllocHandle(SQL_HANDLE_ENV, NULL, &henv);
+    /* 设置环境句柄的 ODBC 版本 */
+    SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3,
+        SQL_IS_INTEGER);
+    /* 申请一个连接句柄 */
+    SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
+
+    sret = SQLConnect(hdbc, (SQLCHAR *)"DM", SQL_NTS, (SQLCHAR *)"SYSDBA", SQL_NTS, (SQLCHAR *)"SYSDBA", SQL_NTS);
+    if (RC_NOTSUCCESSFUL(sret)) {
+        /* 连接数据源失败! */
+        printf("odbc: fail to connect to server!\n");
+        SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
+        SQLFreeHandle(SQL_HANDLE_ENV, henv);
+        exit(0);
+    }
+    printf("odbc: connect to server success!\n");
+}
+/*结束环境
+*/
+void freesql(){
+    /* 断开与数据源之间的连接 */
+    SQLDisconnect(hdbc);
+    /* 释放连接句柄 */
+    SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
+    /* 释放环境句柄 */
+    SQLFreeHandle(SQL_HANDLE_ENV, henv);
 }

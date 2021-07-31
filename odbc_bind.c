@@ -65,10 +65,20 @@ int main(void)
     SQLBindCol(hstmt, 2, SQL_C_CHAR, &out_c2, sizeof(out_c2), &out_c2_ind);
 
     printf("odbc: select * from table...\n");
-    while(SQLFetch(hstmt) != SQL_NO_DATA)
+    // while(SQLFetch(hstmt) != SQL_NO_DATA)
+    // {
+    //     printf("c1 = %d, c2 = %s ,\n", out_c1, out_c2);
+    // }
+    while(SQLFetchScroll(hstmt,SQL_FETCH_NEXT,0) != SQL_NO_DATA_FOUND)
     {
         printf("c1 = %d, c2 = %s ,\n", out_c1, out_c2);
     }
+    // for (; ;)
+    // {
+    //     SQLFetchScoll(hstmt,SQL_FETCH_NEXT,0);
+
+    // }
+    
     printf("odbc: select success\n");
 
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);

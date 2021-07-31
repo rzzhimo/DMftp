@@ -1,20 +1,26 @@
 CC := gcc
-CFLAGS := -Wall -g -Os
+includepath=/opt/dmdbms/include
+libpath=/opt/dmdbms/bin
+vpath=./
+
+CFLAGS := -I$(includepath) -Wall -g -Os -DDM64
+LINKFLAGS=-L$(libpath) -ldodbc -Wall -Wl,-rpath $(libpath)
 
 SHDIR := ../common
 
-OBJS = ftserve.o $(SHDIR)/common.o
+OBJS = ftserver.o $(SHDIR)/common.o
 
-all: ftserve
+all: ftserver
 
-ftserve: $(OBJS)
-	@$(CC) -o ftserve $(CFLAGS) $(OBJS)
+ftserver: $(OBJS)
+	@$(CC) -o ftserver $(CFLAGS) $(OBJS) -g $(LINKFLAGS)
 
 $(OBJS) : %.o: %.c 
 	@$(CC) -c $(CFLAGS) $< -o $@
+	@echo make ok.
 
 .PHONY:
 clean:
-	@rm -f *.o ftserve
+	@rm -f *.o ftserver
 	@rm -f ../common/*.o
 	@echo Done cleaning
